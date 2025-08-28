@@ -8,20 +8,54 @@ class Point:
         self.x = x
         self.y = y
 
-    def distance_to_point(self, other):
+    def distanceToPoint(self, other):
         return math.hypot(self.x - other.x, self.y - other.y)
     
     def __repr__(self):
         return f"Point({self.x}, {self.y})"
     
+    def __eq__(self, other):
+        if other is None:
+            return False
+        return self.x == other.x and self.y == other.y
+    
+    def plot(self, ax, color='purple', linestyle='None'):
+        ax.plot(self.x, self.y, marker='o', color=color, linestyle=linestyle)
+    
 
-class edge:
+class Edge:
     def __init__(self, start: Point, end: Point):
         self.start = start
         self.end = end
         self.crowded = False
+        self.isCovered = False
+
+    def isIncident(self, point: Point):
+        return (self.start == point) or (self.end == point)
     
-    def distance_to_point(self, point: Point):
+    def __eq__(self, other):
+        return ((self.start == other.start and self.end == other.end) or
+                (self.start == other.end and self.end == other.start))
+    
+    def circleSubdivision(self, circle: 'Circle'):
+        #vector
+        vector_x = 0
+        vector_y = 0
+        subvisoinPoint = None
+        if self.start == circle.center:
+            vector_x = self.end.x - self.start.x
+            vector_y = self.end.y - self.start.y
+            subvisoinPoint = Point(self.start.x + vector_x * circle.radius / math.hypot(vector_x, vector_y),
+                                   self.start.y + vector_y * circle.radius / math.hypot(vector_x, vector_y))
+        elif self.end == circle.center:
+            vector_x = self.start.x - self.end.x
+            vector_y = self.start.y - self.end.y
+            subvisoinPoint = Point(self.end.x + vector_x * circle.radius / math.hypot(vector_x, vector_y),
+                                   self.end.y + vector_y * circle.radius / math.hypot(vector_x, vector_y))
+
+        return subvisoinPoint
+    
+    def distanceToPoint(self, point: Point):
 
         closest_x, closest_y = 0, 0
 
@@ -53,8 +87,8 @@ class Circle:
         self.center = center
         self.radius = radius
 
-    def circle_intersects(self, other):
-        dist_centers = self.center.distance_to_point(other.center)
+    def circleIntersects(self, other):
+        dist_centers = self.center.distanceToPoint(other.center)
         return dist_centers < (self.radius + other.radius)
     
     def setRadius(self, new_radius):
@@ -62,6 +96,13 @@ class Circle:
 
     def setCenter(self, new_center: Point):
         self.center = new_center
+
+    def __eq__(self, other):
+        return self.center == other.center and self.radius == other.radius
+    
+    def plot(self, ax, color='red', linestyle='--'):
+        circle_patch = plt.Circle((self.center.x, self.center.y), self.radius, color=color, fill=False, linestyle=linestyle, linewidth=1.0)
+        ax.add_patch(circle_patch)
     
 class Polygon:
     def __init__(self, vertices):
@@ -76,7 +117,7 @@ class Polygon:
         for i in range(n):
             start = self.vertices[i]
             end = self.vertices[(i + 1) % n]
-            new = edge(start, end)
+            new = Edge(start, end)
             edges.append(new)
         return edges
     
