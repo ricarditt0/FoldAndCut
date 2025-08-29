@@ -24,11 +24,11 @@ class Point:
     
 
 class Edge:
-    def __init__(self, start: Point, end: Point):
+    def __init__(self, start: Point, end: Point,covered=False):
         self.start = start
         self.end = end
         self.crowded = False
-        self.isCovered = False
+        self.isCovered = covered
 
     def isIncident(self, point: Point):
         return (self.start == point) or (self.end == point)
@@ -36,6 +36,12 @@ class Edge:
     def __eq__(self, other):
         return ((self.start == other.start and self.end == other.end) or
                 (self.start == other.end and self.end == other.start))
+    
+    def length(self):
+        return self.start.distanceToPoint(self.end)
+    
+    def midpoint(self):
+        return Point((self.start.x + self.end.x) / 2, (self.start.y + self.end.y) / 2)
     
     def circleSubdivision(self, circle: 'Circle'):
         #vector
@@ -54,6 +60,9 @@ class Edge:
                                    self.end.y + vector_y * circle.radius / math.hypot(vector_x, vector_y))
 
         return subvisoinPoint
+    
+    def plot(self, ax, color='green', linestyle='-'):
+        ax.plot([self.start.x, self.end.x], [self.start.y, self.end.y], color=color, linestyle=linestyle, linewidth=1.5)
     
     def distanceToPoint(self, point: Point):
 
@@ -105,42 +114,70 @@ class Circle:
         ax.add_patch(circle_patch)
     
 class Polygon:
-    def __init__(self, vertices):
+    def __init__(self, vertices, edges, bounding_box):
         self.vertices = vertices
-        self.edges = self.edges()
+        self.edges = edges
         self.subdivisions_points = []
         self.subdivisions_edges = []
+        self.bounding_box = bounding_box
+        self.circles = []
+
+    def circlesColide(self, circle: Circle):
+        for c in self.circles:
+            if c.circleIntersects(circle):
+                return True
+        return False
+
+    def generateVertexCircles(self):
+        circles = []
+        vertex = self.vertices
+        edges = self.edges
+
+        for v in vertex:
+            distance = float('inf')
+            for e in edges:
+                if e.isIncident(v):
+                    continue
+                newDistance = e.distanceToPoint(v)
+                if (newDistance < distance):
+                    distance = newDistance
+            c = Circle(v, distance/2)
+            circles.append(c)  
+        return circles 
     
-    def edges(self):
-        edges = []
-        n = len(self.vertices)
-        for i in range(n):
-            start = self.vertices[i]
-            end = self.vertices[(i + 1) % n]
-            new = Edge(start, end)
-            edges.append(new)
-        return edges
-    
+    def generateEdgeSubdivisions(self):
+        subdivision_points = []
+        subdivision_edges = self.edges
+        circles = self.circles # Assume circles have been generated and assigned to self.circles
+
+        for circle in circles:            
+            for edge in subdivision_edges:
+                if edge.isCovered:
+                    continue
+                if edge.circleSubdivision(circle) != None:
+                    sub_point = (edge.circleSubdivision(circle))
+                    subdivision_points.append(sub_point)
+                    if (circle.center == edge.start):
+                        start_to_sub = Edge(edge.start, sub_point,covered=True)
+                        sub_to_end = Edge(sub_point, edge.end)
+                    else:
+                        start_to_sub = Edge(edge.start, sub_point)
+                        sub_to_end = Edge(sub_point, edge.end,covered=True)
+                    subdivision_edges.remove(edge)
+                    subdivision_edges.append(start_to_sub)
+                    subdivision_edges.append(sub_to_end)
+        
+        self.subdivisions_points = subdivision_points
+        self.subdivisions_edges = subdivision_edges
+            
+
     def plot(self, ax, color='blue', linestyle='-'):
-        coords = [(v.x, v.y) for v in self.vertices]
-        p = plt.Polygon(coords, fill=None, edgecolor=color, linestyle=linestyle, linewidth=1.5)
-        ax.add_patch(p)
+        for edge in self.edges:
+            edge.plot(ax, color=color, linestyle=linestyle)
 
         ax.set_xlim(-1, 6)
         ax.set_ylim(-1, 5)
     
     
 if __name__ == "__main__":
-
-    fig, ax = plt.subplots(figsize=(6, 5))
-
-    p1, p2, p3 = Point(1.0, 1.0), Point(4.0, 1.0), Point(2.5, 3.0)
-    triangle = Polygon([p1, p2, p3])
-    triangle.plot(ax, color='blue')
-
-    p4, p5, p6, p7 = Point(0.0, 0.0), Point(5.0, 0.0), Point(5.0, 4.0), Point(0.0, 4.0)
-    rectangle = Polygon([p4, p5, p6, p7])
-    rectangle.plot(ax, color='black')
-
-
-    plt.show()
+    pass

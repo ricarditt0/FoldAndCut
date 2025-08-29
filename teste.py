@@ -79,37 +79,19 @@ class testCircleMethods(unittest.TestCase):
 
 
 class testPolygonMethods(unittest.TestCase):
-    def test_polygon_edges(self):
-        # Create points and polygon
-        p1 = Point(1.0, 1.0)
-        p2 = Point(4.0, 1.0)
-        p3 = Point(2.5, 3.0)
-        triangle = Polygon([p1, p2, p3])
-
-        # Get edges
-        edges = triangle.edges
-
-        # Assert the expected edges
-        self.assertEqual(edges[0],Edge(p1, p2))
-        self.assertEqual(edges[1],Edge(p2, p3))
-        self.assertEqual(edges[2],Edge(p3, p1))
-        self.assertEqual(edges[0],Edge(p2, p1))
-        self.assertEqual(edges[1],Edge(p3, p2))
-        self.assertEqual(edges[2],Edge(p1, p3))
-
-
-class testFoldAndCutMethods(unittest.TestCase):
     def test_generate_vertex_circles(self):
         # Create triangle and rectangle
         p1, p2, p3 = Point(1.0, 1.0), Point(4.0, 1.0), Point(2.5, 3.0)
-        triangle = Polygon([p1, p2, p3])
+        e1, e2, e3 = Edge(p1, p2), Edge(p2, p3), Edge(p3, p1)
         p4, p5, p6, p7 = Point(0.0, 0.0), Point(5.0, 0.0), Point(5.0, 4.0), Point(0.0, 4.0)
-        rectangle = Polygon([p4, p5, p6, p7])
+        e4, e5, e6, e7 = Edge(p4, p5), Edge(p5, p6), Edge(p6, p7), Edge(p7, p4)
+        bounding_box = [p4, p5, p6, p7]
 
+        triangle = Polygon([p1, p2, p3, p4, p5, p6, p7], [e1, e2, e3, e4, e5, e6, e7], bounding_box)
         # Generate circles
-        circles = generateVertexCircles(triangle, rectangle)
+        circles = triangle.generateVertexCircles()
         expected_radius = [0.5, 0.5, 0.5, 0.7, 0.7, 1.3, 1.3]
-        vertex = triangle.vertices + rectangle.vertices
+        vertex = triangle.vertices
 
         # Assert the expected circles
         for c in range(len(circles)):
@@ -118,6 +100,9 @@ class testFoldAndCutMethods(unittest.TestCase):
             self.assertAlmostEqual(circle.radius, expec_rad, places=1, msg='failed {c}')
             self.assertEqual(circle.center, vertex[c], msg='failed center {c}')
 
+
+class testFoldAndCutMethods(unittest.TestCase):
+    pass
 
 
 if __name__ == "__main__":
