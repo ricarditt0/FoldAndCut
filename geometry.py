@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 
 
 class Point:
-    def __init__(self, x, y):
+    def __init__(self, x, y,vertexCricle:'Circle'=None):
         self.x = x
         self.y = y
+        self.vertexCircle = vertexCricle
 
     def distanceToPoint(self, other):
         return math.hypot(self.x - other.x, self.y - other.y)
@@ -21,14 +22,37 @@ class Point:
     
     def plot(self, ax, color='purple', linestyle='None'):
         ax.plot(self.x, self.y, marker='o', color=color, linestyle=linestyle)
+
+class Circle:
+    def __init__(self, center: Point, radius: float):
+        self.center = center
+        self.radius = radius
+
+    def circleIntersects(self, other):
+        eps=1e-9
+        dist_centers = self.center.distanceToPoint(other.center)
+        return dist_centers < (self.radius + other.radius - eps)
     
+    def setRadius(self, new_radius):
+        self.radius = new_radius
+
+    def setCenter(self, new_center: Point):
+        self.center = new_center
+
+    def __eq__(self, other):
+        return self.center == other.center and self.radius == other.radius
+    
+    def plot(self, ax, color='red', linestyle='--'):
+        circle_patch = plt.Circle((self.center.x, self.center.y), self.radius, color=color, fill=False, linestyle=linestyle, linewidth=1.0)
+        ax.add_patch(circle_patch)
 
 class Edge:
-    def __init__(self, start: Point, end: Point,covered=False):
+    def __init__(self, start:Point, end:Point,covered=False,edgeCircle:Circle=None):
         self.start = start
         self.end = end
         self.crowded = False
         self.isCovered = covered
+        self.edgeCircle = edgeCircle
 
     def isIncident(self, point: Point):
         return (self.start == point) or (self.end == point)
@@ -36,14 +60,19 @@ class Edge:
     def __eq__(self, other):
         return ((self.start == other.start and self.end == other.end) or
                 (self.start == other.end and self.end == other.start))
-    
+
     def length(self):
         return self.start.distanceToPoint(self.end)
     
     def midpoint(self):
         return Point((self.start.x + self.end.x) / 2, (self.start.y + self.end.y) / 2)
     
-    def circleSubdivision(self, circle: 'Circle'):
+    def makeCircle(self):
+        midpoint = self.midpoint()
+        radius = self.length() / 2
+        self.edgeCircle = Circle(midpoint, radius)
+    
+    def circleSubdivision(self, circle: Circle):
         #vector
         vector_x = 0
         vector_y = 0
@@ -90,28 +119,6 @@ class Edge:
         dy = point.y - closest_y
 
         return math.hypot(dx, dy)
-
-class Circle:
-    def __init__(self, center: Point, radius: float):
-        self.center = center
-        self.radius = radius
-
-    def circleIntersects(self, other):
-        dist_centers = self.center.distanceToPoint(other.center)
-        return dist_centers < (self.radius + other.radius)
-    
-    def setRadius(self, new_radius):
-        self.radius = new_radius
-
-    def setCenter(self, new_center: Point):
-        self.center = new_center
-
-    def __eq__(self, other):
-        return self.center == other.center and self.radius == other.radius
-    
-    def plot(self, ax, color='red', linestyle='--'):
-        circle_patch = plt.Circle((self.center.x, self.center.y), self.radius, color=color, fill=False, linestyle=linestyle, linewidth=1.0)
-        ax.add_patch(circle_patch)
     
 class Polygon:
     def __init__(self, vertices, edges, bounding_box):
@@ -120,35 +127,53 @@ class Polygon:
         self.subdivisions_points = []
         self.subdivisions_edges = []
         self.bounding_box = bounding_box
-        self.circles = []
+        
+    
+    def getEdgesCircles(self):
+        circles = []
+        for edge in self.subdivisions_edges:
+            if edge.edgeCircle is not None:
+                circles.append(edge.edgeCircle)
+        return circles
+    
+    def getVertexCircles(self):
+        circles = []
+        for vertex in self.vertices:
+            if vertex.vertexCircle is not None:
+                circles.append(vertex.vertexCircle) 
+        return circles
+    
+    def getCircles(self):
+        return self.getVertexCircles() + self.getEdgesCircles()
 
-    def circlesColide(self, circle: Circle):
-        for c in self.circles:
-            if c.circleIntersects(circle):
-                return True
-        return False
+    def markCrowdedEdges(self):
+        count = 0
+        circles = self.getCircles()
+        for edge in self.subdivisions_edges:
+            if edge.isCovered:
+                continue
+            for circle in circles:
+                if edge.edgeCircle.circleIntersects(circle) and edge.edgeCircle != circle:
+                    edge.crowded = True
+                    count += 1
+                    break
+        return count 
 
     def generateVertexCircles(self):
-        circles = []
-        vertex = self.vertices
-        edges = self.edges
-
-        for v in vertex:
+        for vertex in self.vertices:
             distance = float('inf')
-            for e in edges:
-                if e.isIncident(v):
+            for edge in self.edges:
+                if edge.isIncident(vertex):
                     continue
-                newDistance = e.distanceToPoint(v)
+                newDistance = edge.distanceToPoint(vertex)
                 if (newDistance < distance):
                     distance = newDistance
-            c = Circle(v, distance/2)
-            circles.append(c)  
-        return circles 
+            c = Circle(vertex, distance/2)
+            vertex.vertexCircle = c
     
     def generateEdgeSubdivisions(self):
-        subdivision_points = []
         subdivision_edges = self.edges
-        circles = self.circles # Assume circles have been generated and assigned to self.circles
+        circles = self.getCircles()
 
         for circle in circles:            
             for edge in subdivision_edges:
@@ -156,7 +181,7 @@ class Polygon:
                     continue
                 if edge.circleSubdivision(circle) != None:
                     sub_point = (edge.circleSubdivision(circle))
-                    subdivision_points.append(sub_point)
+                    self.subdivisions_points.append(sub_point)
                     if (circle.center == edge.start):
                         start_to_sub = Edge(edge.start, sub_point,covered=True)
                         sub_to_end = Edge(sub_point, edge.end)
@@ -167,9 +192,43 @@ class Polygon:
                     subdivision_edges.append(start_to_sub)
                     subdivision_edges.append(sub_to_end)
         
-        self.subdivisions_points = subdivision_points
-        self.subdivisions_edges = subdivision_edges
+        self.subdivisions_edges = subdivision_edges[:]
             
+    def generateEdgeCircles(self):
+        for edge in self.subdivisions_edges:
+            if edge.isCovered:
+                continue
+            edge.makeCircle()
+                
+
+    def splitCrowdedEdges(self):
+        while self.markCrowdedEdges():
+            new_subdivision_edges = []
+            # marcar crowded
+            
+            for edge in self.subdivisions_edges:
+                if edge.isCovered:
+                    new_subdivision_edges.append(edge)
+                    continue
+                
+                if edge.crowded:
+                    midpoint = edge.midpoint()
+                    self.subdivisions_points.append(midpoint)
+
+                    start_to_mid = Edge(edge.start, midpoint)
+                    start_to_mid.makeCircle()
+                    mid_to_end = Edge(midpoint, edge.end)
+                    mid_to_end.makeCircle()
+
+                    new_subdivision_edges.extend([start_to_mid, mid_to_end])
+                else:
+                    new_subdivision_edges.append(edge)
+
+            self.subdivisions_edges = new_subdivision_edges[:]
+
+
+
+
 
     def plot(self, ax, color='blue', linestyle='-'):
         for edge in self.edges:

@@ -15,18 +15,41 @@ if __name__ == "__main__":
    triangle = Polygon([p1, p2, p3, p4, p5, p6, p7], [e1, e2, e3, e4, e5, e6, e7], bounding_box)
    triangle.plot(ax, color='black')
 
-   triangle.circles = triangle.generateVertexCircles()
-   Circles = triangle.circles
-   for circle in Circles:
-      circle.plot(ax, color='red', linestyle='--')
+   triangle.generateVertexCircles()
+   
+   triangle.generateEdgeSubdivisions() # <----
 
-   triangle.generateEdgeSubdivisions()
+   triangle.generateEdgeCircles()
+   print(len(triangle.subdivisions_edges))
+
+   triangle.splitCrowdedEdges()
+   print(len(triangle.subdivisions_edges))
+   triangle.markCrowdedEdges()
+
+   circles = triangle.getVertexCircles()
+   for circle in circles:
+      circle.plot(ax, color='red')
+
    edges = triangle.subdivisions_edges
    for edge in edges:
-      if edge.isCovered:
+      if edge.crowded:
          edge.plot(ax, color='orange', linestyle='-')
       else:
          edge.plot(ax, color='blue', linestyle='-')
+
+   vertexes = triangle.subdivisions_points
+   for vertex in vertexes:
+      vertex.plot(ax, color='black')
+
+   circles = triangle.getEdgesCircles()
+
+   for circle in circles:
+      circle.plot(ax, color='green')
+
+   # circles[8].plot(ax,color = 'green')
+   # circles[9].plot(ax,color = 'green')
+   # print(circles[8].circleIntersects(circles[9]))
+
 
 
    plt.show()
