@@ -1,289 +1,91 @@
-import math
 import matplotlib.pyplot as plt
-from scipy.spatial import Voronoi
-
-eps=1e-9
-
 
 class Point:
-    def __init__(self, x, y,vertexCricle:'Circle'=None):
+    def __init__(self, x: float, y: float, isPoint=True):
         self.x = x
         self.y = y
-        self.vertexCircle = vertexCricle
+        self.isPoint = True
 
-    def distanceToPoint(self, other):
-        return math.hypot(self.x - other.x, self.y - other.y)
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+    
+    def __add__(self, other):
+        return Point(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other):
+        return Point(self.x - other.x, self.y - other.y, isPoint=False)
+    
+    def __mul__(self, scalar: float):
+        return Point(self.x * scalar, self.y * scalar)
+    
+    def __hash__(self):
+        return hash((self.x, self.y))
+
+    def almost_equal(p1, p2, eps=1e-6):
+        return abs(p1.x - p2.x) < eps and abs(p1.y - p2.y) < eps
+
+    def normalize(self):
+        length = (self.x ** 2 + self.y ** 2) ** 0.5
+        if length == 0:
+            return Point(0, 0)
+        return Point(self.x / length, self.y / length)
     
     def __repr__(self):
         return f"Point({self.x}, {self.y})"
     
-    def __eq__(self, other):
-        if other is None:
-            return False
-        return self.x == other.x and self.y == other.y
-    
-    def plot(self, ax, color='purple', linestyle='None'):
-        ax.plot(self.x, self.y, marker='o', color=color, linestyle=linestyle)
-
-class Circle:
-    def __init__(self, center: Point, radius: float):
-        self.center = center
-        self.radius = radius
-        center.vertexCircle = self
-
-    def circleIntersects(self, other):
-        dist_centers = self.center.distanceToPoint(other.center)
-        return dist_centers < (self.radius + other.radius - eps)
-    
-    def circleTouches(self, other):
-        dist_centers = self.center.distanceToPoint(other.center)
-        return abs(dist_centers - (self.radius + other.radius)) < eps
-    
-    def pointIsInside(self,point):
-        dist_center_to_point = self.center.distanceToPoint(point)
-        return  dist_center_to_point <= (self.radius)
-
-    def setRadius(self, new_radius):
-        self.radius = new_radius
-
-    def setCenter(self, new_center: Point):
-        self.center = new_center
-
-    def __eq__(self, other):
-        return self.center == other.center and self.radius == other.radius
-    
-    def __ge__(self, other):
-        return self.radius >= other.radius
-    
-    def distanceToPoint(self, point: Point):
-        dist_center_to_point = self.center.distanceToPoint(point)
-        return max(0, dist_center_to_point - self.radius)  # Return 0 if the point is inside the circle
-    
-    def circleCenter(circleA, circleB , circleC):
-        a1 = 2 * (circleB.center.x - circleA.center.x)
-        b1 = 2 * (circleB.center.y - circleA.center.y)
-        c1 = circleB.center.x**2 + circleB.center.y**2 - circleA.center.x**2 - circleA.center.y**2 - circleB.radius**2 + circleA.radius**2
-
-        a2 = 2 * (circleC.center.x - circleB.center.x)
-        b2 = 2 * (circleC.center.y - circleB.center.y)
-        c2 = circleC.center.x**2 + circleC.center.y**2 - circleB.center.x**2 - circleB.center.y**2 - circleC.radius**2 + circleB.radius**2
-
-        determinant = a1*b2 - a2*b1
-        if abs(determinant) < eps:
-            return None  # Lines are parallel or coincident
-
-        x = (c1*b2 - c2*b1) / determinant
-        y = (a1*c2 - a2*c1) / determinant
-        circle_center = Point(x ,y)
-        return circle_center
-    
-    def plot(self, ax, color='red', linestyle='--'):
-        circle_patch = plt.Circle((self.center.x, self.center.y), self.radius, color=color, fill=False, linestyle=linestyle, linewidth=1.0)
-        ax.add_patch(circle_patch)
+    def draw (self, ax, color='black'):
+        ax.plot(self.x, self.y, marker='o', color=color)
 
 class Edge:
-    def __init__(self, start:Point, end:Point,covered=False,edgeCircle:Circle=None):
-        self.start = start
+    def __init__(self, ini:Point, end:Point):
+        self.ini = ini
         self.end = end
-        self.crowded = False
-        self.isCovered = covered
-        self.edgeCircle = edgeCircle
-
-    def isIncident(self, point: Point):
-        return (self.start == point) or (self.end == point)
+        self.isEdge = True
     
-    def __eq__(self, other):
-        return ((self.start == other.start and self.end == other.end) or
-                (self.start == other.end and self.end == other.start))
-
     def length(self):
-        return self.start.distanceToPoint(self.end)
-    
-    def midpoint(self):
-        return Point((self.start.x + self.end.x) / 2, (self.start.y + self.end.y) / 2)
-    
-    def makeCircle(self):
-        midpoint = self.midpoint()
-        radius = self.length() / 2
-        self.edgeCircle = Circle(midpoint, radius)
-    
-    def circleSubdivision(self, circle: Circle):
-        #vector
-        vector_x = 0
-        vector_y = 0
-        subvisoinPoint = None
-        if self.start == circle.center:
-            vector_x = self.end.x - self.start.x
-            vector_y = self.end.y - self.start.y
-            subvisoinPoint = Point(self.start.x + vector_x * circle.radius / math.hypot(vector_x, vector_y),
-                                   self.start.y + vector_y * circle.radius / math.hypot(vector_x, vector_y))
-        elif self.end == circle.center:
-            vector_x = self.start.x - self.end.x
-            vector_y = self.start.y - self.end.y
-            subvisoinPoint = Point(self.end.x + vector_x * circle.radius / math.hypot(vector_x, vector_y),
-                                   self.end.y + vector_y * circle.radius / math.hypot(vector_x, vector_y))
+        return ((self.end.x - self.ini.x) ** 2 + (self.end.y - self.ini.y) ** 2) ** 0.5
 
-        return subvisoinPoint
+    def __eq__(self, value):
+        return (self.ini == value.ini and self.end == value.end) or (self.ini == value.end and self.end == value.ini)
+
+    def __repr__(self):
+        return f"Edge star({self.ini}), end({self.end})"
     
-    def plot(self, ax, color='green', linestyle='-'):
-        ax.plot([self.start.x, self.end.x], [self.start.y, self.end.y], color=color, linestyle=linestyle, linewidth=1.5)
-    
-    def distanceToPoint(self, point: Point):
+    def draw(self, ax, color='black'):
+        ax.plot([self.ini.x, self.end.x], [self.ini.y, self.end.y], color=color)
 
-        closest_x, closest_y = 0, 0
+class Ray:
+    def __init__(self, origin:Point, direction:Point):
+        self.origin = origin
+        self.direction = direction.normalize()
+        self.isRay = True
 
-        #vector start to end
-        start_endx = self.end.x - self.start.x
-        start_endy = self.end.y - self.start.y
+    def intersect(self, other):
+        # Resolve P1 + t1*b1 = P2 + t2*b2
+        p1, b1 = self.origin, self.direction
+        p2, b2 = other.origin, other.direction
+        dx = p2.x - p1.x
+        dy = p2.y - p1.y
+        det = b1.x * b2.y - b1.y * b2.x
+        if det == 0:
+            print("No intersection: parallel lines")
+            return None  # Parallel lines
 
-        #vector start to point
-        start_pointx = point.x - self.start.x
-        start_pointy = point.y - self.start.y
+        t1 = (dx * b2.y - dy * b2.x) / det
+        t2 = (dx * b1.y - dy * b1.x) / det
 
-        #scalar projection of start_point onto start_end normalized
-        t = (start_pointx * start_endx + start_pointy * start_endy) / (start_endx * start_endx + start_endy * start_endy)
-        if t < 0:
-            closest_x, closest_y = self.start.x, self.start.y
-        elif t > 1:
-            closest_x, closest_y = self.end.x, self.end.y
-        else:
-            closest_x = self.start.x + t * start_endx
-            closest_y = self.start.y + t * start_endy
-
-        dx = point.x - closest_x
-        dy = point.y - closest_y
-
-        return math.hypot(dx, dy)
-    
-class Polygon:
-    def __init__(self, vertices, edges, bounding_box):
-        self.vertices = vertices
-        self.edges = edges
-        self.subdivisions_points = []
-        self.subdivisions_edges = []
-        self.voronoi_points = []
-        self.bounding_box = bounding_box
-           
-    def pointInBoundingBox(self, point: Point):
-        min_x = float('inf')
-        max_x = float('-inf')
-        min_y = float('inf')
-        max_y = float('-inf')
-        for vertex in self.bounding_box:
-            if vertex.x < min_x:
-                min_x = vertex.x
-            if vertex.x > max_x:
-                max_x = vertex.x
-            if vertex.y < min_y:
-                min_y = vertex.y
-            if vertex.y > max_y:
-                max_y = vertex.y
-       
-        return (min_x <= point.x <= max_x) and (min_y <= point.y <= max_y)
-    
-    def getEdgesCircles(self):
-        circles = []
-        for edge in self.subdivisions_edges:
-            if edge.edgeCircle is not None:
-                circles.append(edge.edgeCircle)
-        return circles
-    
-    def getVertexCircles(self):
-        circles = []
-        for vertex in self.vertices:
-            if vertex.vertexCircle is not None:
-                circles.append(vertex.vertexCircle) 
-        return circles
-    
-    def getCircles(self):
-        return self.getVertexCircles() + self.getEdgesCircles()
-
-    def markCrowdedEdges(self):
-        count = 0
-        circles = self.getCircles()
-        for edge in self.subdivisions_edges:
-            if edge.isCovered:
-                continue
-            for circle in circles:
-                if edge.edgeCircle.circleIntersects(circle) and edge.edgeCircle != circle:
-                    edge.crowded = True
-                    count += 1
-                    break
-        return count 
-
-    def generateVertexCircles(self):
-        for vertex in self.vertices:
-            distance = float('inf')
-            for edge in self.edges:
-                if edge.isIncident(vertex):
-                    continue
-                newDistance = edge.distanceToPoint(vertex)
-                if (newDistance < distance):
-                    distance = newDistance
-            c = Circle(vertex, distance/2)
-            vertex.vertexCircle = c
-    
-    def generateEdgeSubdivisions(self):
-        subdivision_edges = self.edges
-        circles = self.getCircles()
-
-        for circle in circles:            
-            for edge in subdivision_edges:
-                if edge.isCovered:
-                    continue
-                if edge.circleSubdivision(circle) != None:
-                    sub_point = (edge.circleSubdivision(circle))
-                    self.subdivisions_points.append(sub_point)
-                    if (circle.center == edge.start):
-                        start_to_sub = Edge(edge.start, sub_point,covered=True)
-                        sub_to_end = Edge(sub_point, edge.end)
-                    else:
-                        start_to_sub = Edge(edge.start, sub_point)
-                        sub_to_end = Edge(sub_point, edge.end,covered=True)
-                    subdivision_edges.remove(edge)
-                    subdivision_edges.append(start_to_sub)
-                    subdivision_edges.append(sub_to_end)
+        if t1 < 0 or t2 < 0:
+            print("No intersection: t1 =", t1, ", t2 =", t2)
+            return None  # Intersection is behind the ray origin
         
-        self.subdivisions_edges = subdivision_edges[:]
-            
-    def generateEdgeCircles(self):
-        for edge in self.subdivisions_edges:
-            if edge.isCovered:
-                continue
-            edge.makeCircle()
-                
-    def splitCrowdedEdges(self):
-        while self.markCrowdedEdges():
-            new_subdivision_edges = []
-            # marcar crowded
-            
-            for edge in self.subdivisions_edges:
-                if edge.isCovered:
-                    new_subdivision_edges.append(edge)
-                    continue
-                
-                if edge.crowded:
-                    midpoint = edge.midpoint()
-                    self.subdivisions_points.append(midpoint)
+        else:
+            intersection_point = Point(p1.x + t1 * b1.x, p1.y + t1 * b1.y)
+            return intersection_point , t1, t2
 
-                    start_to_mid = Edge(edge.start, midpoint)
-                    start_to_mid.makeCircle()
-                    mid_to_end = Edge(midpoint, edge.end)
-                    mid_to_end.makeCircle()
 
-                    new_subdivision_edges.extend([start_to_mid, mid_to_end])
-                else:
-                    new_subdivision_edges.append(edge)
+    def draw(self, ax, length=10.0, color='black'):
+        end_point = self.origin + self.direction.normalize() * length
+        ax.plot([self.origin.x, end_point.x], [self.origin.y, end_point.y], color=color)
 
-            self.subdivisions_edges = new_subdivision_edges[:]
-
-    def plot(self, ax, color='blue', linestyle='-'):
-        for edge in self.edges:
-            edge.plot(ax, color=color, linestyle=linestyle)
-
-        ax.set_xlim(-1, 6)
-        ax.set_ylim(-1, 5)
-    
-    
 if __name__ == "__main__":
     pass
