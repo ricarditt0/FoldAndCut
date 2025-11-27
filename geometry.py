@@ -1,6 +1,8 @@
 import math
 import matplotlib.pyplot as plt
+from scipy.spatial import Voronoi
 
+eps=1e-9
 
 
 class Point:
@@ -27,12 +29,20 @@ class Circle:
     def __init__(self, center: Point, radius: float):
         self.center = center
         self.radius = radius
+        center.vertexCircle = self
 
     def circleIntersects(self, other):
-        eps=1e-9
         dist_centers = self.center.distanceToPoint(other.center)
         return dist_centers < (self.radius + other.radius - eps)
     
+    def circleTouches(self, other):
+        dist_centers = self.center.distanceToPoint(other.center)
+        return abs(dist_centers - (self.radius + other.radius)) < eps
+    
+    def pointIsInside(self,point):
+        dist_center_to_point = self.center.distanceToPoint(point)
+        return  dist_center_to_point <= (self.radius)
+
     def setRadius(self, new_radius):
         self.radius = new_radius
 
@@ -41,6 +51,31 @@ class Circle:
 
     def __eq__(self, other):
         return self.center == other.center and self.radius == other.radius
+    
+    def __ge__(self, other):
+        return self.radius >= other.radius
+    
+    def distanceToPoint(self, point: Point):
+        dist_center_to_point = self.center.distanceToPoint(point)
+        return max(0, dist_center_to_point - self.radius)  # Return 0 if the point is inside the circle
+    
+    def circleCenter(circleA, circleB , circleC):
+        a1 = 2 * (circleB.center.x - circleA.center.x)
+        b1 = 2 * (circleB.center.y - circleA.center.y)
+        c1 = circleB.center.x**2 + circleB.center.y**2 - circleA.center.x**2 - circleA.center.y**2 - circleB.radius**2 + circleA.radius**2
+
+        a2 = 2 * (circleC.center.x - circleB.center.x)
+        b2 = 2 * (circleC.center.y - circleB.center.y)
+        c2 = circleC.center.x**2 + circleC.center.y**2 - circleB.center.x**2 - circleB.center.y**2 - circleC.radius**2 + circleB.radius**2
+
+        determinant = a1*b2 - a2*b1
+        if abs(determinant) < eps:
+            return None  # Lines are parallel or coincident
+
+        x = (c1*b2 - c2*b1) / determinant
+        y = (a1*c2 - a2*c1) / determinant
+        circle_center = Point(x ,y)
+        return circle_center
     
     def plot(self, ax, color='red', linestyle='--'):
         circle_patch = plt.Circle((self.center.x, self.center.y), self.radius, color=color, fill=False, linestyle=linestyle, linewidth=1.0)
@@ -126,8 +161,25 @@ class Polygon:
         self.edges = edges
         self.subdivisions_points = []
         self.subdivisions_edges = []
+        self.voronoi_points = []
         self.bounding_box = bounding_box
-        
+           
+    def pointInBoundingBox(self, point: Point):
+        min_x = float('inf')
+        max_x = float('-inf')
+        min_y = float('inf')
+        max_y = float('-inf')
+        for vertex in self.bounding_box:
+            if vertex.x < min_x:
+                min_x = vertex.x
+            if vertex.x > max_x:
+                max_x = vertex.x
+            if vertex.y < min_y:
+                min_y = vertex.y
+            if vertex.y > max_y:
+                max_y = vertex.y
+       
+        return (min_x <= point.x <= max_x) and (min_y <= point.y <= max_y)
     
     def getEdgesCircles(self):
         circles = []
@@ -200,7 +252,6 @@ class Polygon:
                 continue
             edge.makeCircle()
                 
-
     def splitCrowdedEdges(self):
         while self.markCrowdedEdges():
             new_subdivision_edges = []
@@ -225,10 +276,6 @@ class Polygon:
                     new_subdivision_edges.append(edge)
 
             self.subdivisions_edges = new_subdivision_edges[:]
-
-
-
-
 
     def plot(self, ax, color='blue', linestyle='-'):
         for edge in self.edges:
