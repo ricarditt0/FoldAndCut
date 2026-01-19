@@ -207,7 +207,7 @@ def build_polygon(points):
 if __name__ == "__main__":
     fig, ax = plt.subplots(figsize=(6, 5))
 
-    points = load_json('polygons.json','square')
+    points = load_json('polygons.json','turtle')
     polygon,edges = build_polygon(points)
 
     #Set of List of Active Vertices
@@ -220,59 +220,59 @@ if __name__ == "__main__":
         polygon.bisecting()
         # polygon.rayDirection.draw(ax, length=10.0, color='green')
         polygon.point.draw(ax, color='blue')
-        # polygon.outEdge.draw(ax, color='red')
+        polygon.outEdge.draw(ax, color='red')
         
         if polygon == endOfList:
             break
         polygon = polygon.next
 
 
-    listOfEvents = []
-    Slav.append(polygon)
-    for lav in Slav:
-        vertex = lav
-        endOfList = vertex.prev
-        while True:
-            if vertex._isReflex:
-                continue
-            else:
-                event = Event.findEdgeEvent(vertex, vertex.next)
+    # listOfEvents = []
+    # Slav.append(polygon)
+    # for lav in Slav:
+    #     vertex = lav
+    #     endOfList = vertex.prev
+    #     while True:
+    #         if vertex._isReflex:
+    #             continue
+    #         else:
+    #             event = Event.findEdgeEvent(vertex, vertex.next)
 
-            if event is not None:
-                heapq.heappush(listOfEvents, event)
+    #         if event is not None:
+    #             heapq.heappush(listOfEvents, event)
             
-            if vertex == endOfList:
-                break
+    #         if vertex == endOfList:
+    #             break
 
-            vertex = vertex.next
+    #         vertex = vertex.next
 
-    skeletonGraph = graph()
+    # skeletonGraph = graph()
 
-    newVertex = None
+    # newVertex = None
 
-    while listOfEvents:
-        currentEvent = heapq.heappop(listOfEvents)
-        if not currentEvent.isValid():
-            continue
-        else:
-            if currentEvent.type == 'edge':
-                newVertex = currentEvent.processEdgeEvent(skeletonGraph)
-                # Add new events involving the new vertex
-                eventA = Event.findEdgeEvent(newVertex.prev, newVertex)
-                eventB = Event.findEdgeEvent(newVertex, newVertex.next)
-                if eventA is not None:
-                    heapq.heappush(listOfEvents, eventA)
-                if eventB is not None:
-                    heapq.heappush(listOfEvents, eventB)
+    # while listOfEvents:
+    #     currentEvent = heapq.heappop(listOfEvents)
+    #     if not currentEvent.isValid():
+    #         continue
+    #     else:
+    #         if currentEvent.type == 'edge':
+    #             newVertex = currentEvent.processEdgeEvent(skeletonGraph)
+    #             # Add new events involving the new vertex
+    #             eventA = Event.findEdgeEvent(newVertex.prev, newVertex)
+    #             eventB = Event.findEdgeEvent(newVertex, newVertex.next)
+    #             if eventA is not None:
+    #                 heapq.heappush(listOfEvents, eventA)
+    #             if eventB is not None:
+    #                 heapq.heappush(listOfEvents, eventB)
             
-    for v in originalListOfVertices:
-        if v.processed == False:
-            skeletonGraph.add_vertice(v.point)
-            skeletonGraph.add_edge(Edge(v.point, v.next.point))
-            skeletonGraph.add_edge(Edge(v.point, v.prev.point))
+    # for v in originalListOfVertices:
+    #     if v.processed == False:
+    #         skeletonGraph.add_vertice(v.point)
+    #         skeletonGraph.add_edge(Edge(v.point, v.next.point))
+    #         skeletonGraph.add_edge(Edge(v.point, v.prev.point))
 
-    skeletonGraph.draw(ax)
-    print(skeletonGraph.vertices)
+    # skeletonGraph.draw(ax)
+    # print(skeletonGraph.vertices)
    
     
     plt.show()
