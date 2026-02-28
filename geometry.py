@@ -36,11 +36,13 @@ class Point:
     def draw (self, ax, color='black'):
         ax.plot(self.x, self.y, marker='o', color=color)
 
+    def draw_seg(self, point, ax, color='black'):
+        ax.plot([self.x, point.x], [self.y, point.y], color=color)
+
 class Edge:
     def __init__(self, ini:Point, end:Point):
         self.ini = ini
         self.end = end
-        self.isEdge = True
     
     def length(self):
         return ((self.end.x - self.ini.x) ** 2 + (self.end.y - self.ini.y) ** 2) ** 0.5

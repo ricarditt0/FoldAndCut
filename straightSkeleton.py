@@ -1,167 +1,9 @@
-import matplotlib.pyplot as plt
-import json
-import heapq
+from Lav import *
 from geometry import *
-
-
-class graph:
-    def __init__(self):
-        self.edges = []
-        self.vertices = set()
-
-    def add_vertice(self, vertice:Point):
-        self.vertices.add(vertice)
-    
-    def add_edge(self, edge:Edge):
-        self.edges.append(edge)
-
-    def draw(self, ax, colorP='blue',colorE='red'):
-        for edge in self.edges:
-            edge.draw(ax, color=colorP)
-        for vertex in self.vertices:
-            vertex.draw(ax, color=colorE)
-
-class Vertex:
-    def __init__(self, point:Point, inEdge:Edge, outEdge:Edge):
-        self.point = point
-        self.prev = None
-        self.next = None
-        self.outEdge = outEdge
-        self.inEdge = inEdge
-
-        self.processed = False
-        self.isAlive = True
-        self._isReflex = False
-        self.rayDirection = None
-
-    def isReflex(self):
-        # Vetores
-        v_prev = self.point - self.prev.point
-        v_next = self.next.point - self.point
-        
-        # Cross product
-        cross = v_prev.x * v_next.y - v_prev.y * v_next.x
-        self._isReflex = cross < 0
-
-        return cross < 0  # CCW polygon rule
-
-    def __eq__(self, value):
-        return self.point == value.point #pode dar problema no futuro
-
-    def bisecting(self):
-        self.isReflex()
-        if self._isReflex:
-            dirIn = (self.point - self.inEdge.ini).normalize()
-            dirOut = (self.point - self.outEdge.end).normalize()
-            bicectDir = (dirIn + dirOut).normalize()
-
-        else:
-            dirIn = (self.inEdge.ini - self.point).normalize()
-            dirOut = (self.outEdge.end - self.point).normalize()
-            bicectDir = (dirIn + (dirOut)).normalize()
-    
-        self.rayDirection =  Ray(self.point, bicectDir)
-        return  bicectDir 
-
-class Event:
-    def __init__(self, collison:Point, vertexA: Vertex, vertexB:Vertex, time:float , type:str):
-        self.vertexA = vertexA
-        self.vertexB = vertexB
-        self.collison = collison
-        self.type = type
-        self.time = time
-        # self.merged = False
-        # self.listOfMerged = {}
-
-    def __lt__(eventA, eventB):
-        return eventA.time < eventB.time
-
-    def __repr__(self):
-        return f"Event type({self.type}), collision({self.collison}), time({self.time})"
-    
-    def isValid(self):
-        return self.vertexA.isAlive and self.vertexB.isAlive
-
-    def findEdgeEvent(vertexA:Vertex, vertexB:Vertex):
-
-        if vertexA == vertexB:
-            return None
-
-        rayA = vertexA.rayDirection
-        rayB = vertexB.rayDirection
-
-        intersection = rayA.intersect(rayB)
-        if intersection is None:
-            return None
-
-        point, t1, t2 = intersection
-
-        return Event(point, vertexA, vertexB, t1, 'edge')
-    
-    def processEdgeEvent(self , skeletonGraph:graph):
-        
-        vertexA = self.vertexA
-        vertexB = self.vertexB
-        vertexA.processed = True
-        vertexB.processed = True
-
-        # Mark vertices as not alive
-        vertexA.isAlive = False
-        vertexB.isAlive = False
-
-        # Create a new vertex at the collision point
-        newInEdge = Edge(vertexA.prev.point, self.collison)
-        newOutEdge = Edge(self.collison, vertexB.next.point)
-        newVertex = Vertex(self.collison, newInEdge, newOutEdge)
-        newVertex.processed = True
-
-        # Update the linked list to include the new vertex
-        newVertex.prev = vertexA.prev
-        newVertex.next = vertexB.next
-        vertexA.prev.next = newVertex
-        vertexB.next.prev = newVertex
-
-        # Compute the bisecting ray for the new vertex
-        newVertex.bisecting()
-        newVertex.prev.bisecting()
-        newVertex.next.bisecting()
-
-        vertexA.next = None
-        vertexA.prev = None
-        vertexB.next = None
-        vertexB.prev = None
-
-        skeletonGraph.add_vertice(self.collison)
-        skeletonGraph.add_vertice(vertexA.point)
-        skeletonGraph.add_vertice(vertexB.point)
-        skeletonGraph.add_edge(Edge(vertexA.point, self.collison))
-        skeletonGraph.add_edge(Edge(vertexB.point, self.collison))
-
-        return newVertex
-
-    
-    def __eq__(self,other):
-        return Point.almost_equal(self.collison, other.collison) and self.vertexA == other.vertexA and self.vertexB == other.vertexB and self.type == other.type
-    
-    # def mergeAppend(self, other):
-    #     self.listOfMerged.add(other.vertexA)
-    #     self.listOfMerged.add(other.vertexB)
-    #     if other.merged:
-    #         self.listOfMerged.update(other.listOfMerged)
-
-    # def findequalEvents(self, listOfEvents):
-    #     for event in listOfEvents:
-    #         if self == event:
-    #             return event
-    #     return None
-    
-    def draw(self, ax, color='magenta'):
-        self.collison.draw(ax, color=color)
-        self.vertexA.point.draw(ax, color='cyan')
-        self.vertexB.point.draw(ax, color='cyan')
-        self.vertexA.rayDirection.draw(ax, length=10.0, color='orange')
-        self.vertexB.rayDirection.draw(ax, length=10.0, color='orange')
-        
+from Event import *
+from Skeleton import *
+import heapq
+import json
 
 def load_json(filepath,polygon):
     points = []
@@ -175,20 +17,14 @@ def load_json(filepath,polygon):
     return points
 
 def build_polygon(points):
-    edges = []
     n = len(points)
-    for i in range(n):
-        edge = Edge(points[i], points[(i + 1) % n])
-        edges.append(edge)
-
     
-    n = len(edges)    
-    old_vertex = Vertex(edges[0].ini, edges[-1], edges[0])
+    old_vertex = Vertex(points[0])
     init_vertex = old_vertex
     init_vertex.first = True
 
     for i in range(1, n):
-        new_vertex = Vertex(edges[i].ini, edges[i-1], edges[i])
+        new_vertex = Vertex(points[i])
 
         old_vertex.next = new_vertex
         new_vertex.prev = old_vertex
@@ -198,81 +34,166 @@ def build_polygon(points):
     old_vertex.next = init_vertex
     init_vertex.prev = old_vertex
 
-    return init_vertex , edges
-            
+    return init_vertex
+
+
+class StraightSkeleton:
+    def __init__(self, polygon_points):
+        self.polygon_points = polygon_points
+        self.slav = Slav()
+        self.eventQueue = []
+        self.skeletonGraph = graph()
+        self.buildFirstLAV(polygon_points)
+        self.inicializeEventQueue()
+
+    def findEdgeEvent(vertexA, vertexB):
+        if vertexB is not None:
+  
+            if vertexA == vertexB:
+                return None
+
+            vertexA.bisecting()
+            vertexB.bisecting()
+            rayA = vertexA.rayDirection
+            rayB = vertexB.rayDirection
+
+            intersection = rayA.intersect(rayB)
+            if intersection is None:
+                return None
+
+            point, t1, t2 = intersection
+
+            return Event(point, t1, 'edge', vertexA, vertexB)
+        else:
+            raise ValueError("Vertex does not have a next vertex.")
+
+    def findSplitEvent(self, vertex):
+        # Implement the logic to find the split event for the given vertex
+        pass
+
+    def handleEdgeEvent(self, event):
+        vertexA = event.vertexA
+        vertexB = event.vertexB
+        lav = vertexA.lav
+
+        # Mark vertices as processed
+        vertexA.processed = True
+        vertexB.processed = True
+
+        # Create a new vertex at the collision point
+        newVertex = Vertex(event.collison)
+        newVertex.processed = True
+
+        # Update the linked list to include the new vertex
+        lav.insert_vertex_between(vertexA.prev, vertexB.next, newVertex)
+
+        # Remove the old vertices from the linked list
+        newVertex.lav = lav
+        lav.remove_vertex(vertexA)
+        lav.remove_vertex(vertexB)
+
+        # Compute the bisecting ray for the new vertex
+        newVertex.bisecting()
+        newVertex.prev.bisecting()    
+        newVertex.next.bisecting()
+
+        # Schedule new events for the affected vertices
+        edgeEventA = StraightSkeleton.findEdgeEvent(newVertex.prev, newVertex)
+        edgeEventB = StraightSkeleton.findEdgeEvent(newVertex, newVertex.next)
+
+        if edgeEventA is not None:
+            heapq.heappush(self.eventQueue, edgeEventA)
+        if edgeEventB is not None:
+            heapq.heappush(self.eventQueue, edgeEventB)
+
+        # Update the skeleton graph
+        self.skeletonGraph.add_vertice(event.collison)
+        self.skeletonGraph.add_vertice(vertexA.point)
+        self.skeletonGraph.add_vertice(vertexB.point)
+        self.skeletonGraph.add_edge(Edge(vertexA.point, event.collison))
+        self.skeletonGraph.add_edge(Edge(vertexB.point, event.collison))
+
+        return newVertex
         
+
+    def handleSplitEvent(self, event):
+        # Implement the logic to handle split events
+        pass
     
+    def find_unprocessed_vertex(self):
+        for lav in self.slav.lavs:
+            vertex = lav.head
+            while True:
+                if not vertex.processed and vertex.isAlive:
+                    return vertex
+                vertex = vertex.next
+                if vertex.first:
+                    break
+        return None
+
+    def buildFirstLAV(self, polygon_points):
+        init_vertex = build_polygon(polygon_points)
+        lav = Lav(init_vertex)
+        self.slav.addLav(lav)
+        vertex = lav.head
+        while True:
+            vertex = vertex.next
+            vertex.bisecting()
+            vertex.lav = lav
+            lav.count += 1
+            if vertex.first:
+                break
+
+
+    def inicializeEventQueue(self):
+        for lav in self.slav.lavs:
+            vertex = lav.head
+            while True:
+                event = StraightSkeleton.findEdgeEvent(vertex, vertex.next)
+                if event is not None:
+                    heapq.heappush(self.eventQueue, event)
+                vertex = vertex.next
+                if vertex.first:
+                    break
+    
+    def run(self):
+        while self.eventQueue:
+            event = heapq.heappop(self.eventQueue)
+            if not event.isValid():
+                continue
+
+
+            if event.eventType == 'edge':
+                self.handleEdgeEvent(event)
+                print(f"Processed edge event: {event}")
+
+            elif event.eventType == 'split':
+                self.handleSplitEvent(event)
+
+        # leftover_vertex = self.find_unprocessed_vertex()
+        # while leftover_vertex is not None:
+        #     self.skeletonGraph.add_vertice(leftover_vertex.point)
+        #     self.skeletonGraph.add_edge(Edge(leftover_vertex.point, leftover_vertex.prev.point))
+        #     self.skeletonGraph.add_edge(Edge(leftover_vertex.point, leftover_vertex.next.point))
+        #     leftover_vertex.processed = True
+        #     leftover_vertex = self.find_unprocessed_vertex()
 
 
 if __name__ == "__main__":
-    fig, ax = plt.subplots(figsize=(6, 5))
+    fig1, ax = plt.subplots(figsize=(6, 5))
+    fig2, b = plt.subplots(figsize=(6, 5))
+    fig3, a = plt.subplots(figsize=(6, 5))
 
-    points = load_json('polygons.json','turtle')
-    polygon,edges = build_polygon(points)
+    points = load_json('polygons.json','triangle')
 
-    #Set of List of Active Vertices
-    Slav = []
-    endOfList = polygon.prev
-    originalListOfVertices = []
-
-    while True:
-        originalListOfVertices.append(polygon)
-        polygon.bisecting()
-        # polygon.rayDirection.draw(ax, length=10.0, color='green')
-        polygon.point.draw(ax, color='blue')
-        polygon.outEdge.draw(ax, color='red')
-        
-        if polygon == endOfList:
-            break
-        polygon = polygon.next
-
-
-    # listOfEvents = []
-    # Slav.append(polygon)
-    # for lav in Slav:
-    #     vertex = lav
-    #     endOfList = vertex.prev
-    #     while True:
-    #         if vertex._isReflex:
-    #             continue
-    #         else:
-    #             event = Event.findEdgeEvent(vertex, vertex.next)
-
-    #         if event is not None:
-    #             heapq.heappush(listOfEvents, event)
-            
-    #         if vertex == endOfList:
-    #             break
-
-    #         vertex = vertex.next
-
-    # skeletonGraph = graph()
-
-    # newVertex = None
-
-    # while listOfEvents:
-    #     currentEvent = heapq.heappop(listOfEvents)
-    #     if not currentEvent.isValid():
-    #         continue
-    #     else:
-    #         if currentEvent.type == 'edge':
-    #             newVertex = currentEvent.processEdgeEvent(skeletonGraph)
-    #             # Add new events involving the new vertex
-    #             eventA = Event.findEdgeEvent(newVertex.prev, newVertex)
-    #             eventB = Event.findEdgeEvent(newVertex, newVertex.next)
-    #             if eventA is not None:
-    #                 heapq.heappush(listOfEvents, eventA)
-    #             if eventB is not None:
-    #                 heapq.heappush(listOfEvents, eventB)
-            
-    # for v in originalListOfVertices:
-    #     if v.processed == False:
-    #         skeletonGraph.add_vertice(v.point)
-    #         skeletonGraph.add_edge(Edge(v.point, v.next.point))
-    #         skeletonGraph.add_edge(Edge(v.point, v.prev.point))
-
-    # skeletonGraph.draw(ax)
-    # print(skeletonGraph.vertices)
-   
     
+    skeleton = StraightSkeleton(points)
+    skeleton.slav.lavs[0].draw(b)
+    for event in skeleton.eventQueue:
+        print(event)
+
+    skeleton.run()
+    skeleton.skeletonGraph.draw(a)
+    skeleton.slav.lavs[0].draw(ax)
+    plt.title("Straight Skeleton")
     plt.show()
