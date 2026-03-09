@@ -20,9 +20,23 @@ class Point:
     
     def __hash__(self):
         return hash((self.x, self.y))
-
-    def almost_equal(p1, p2, eps=1e-6):
+    
+    def same_point(p1, p2, eps=1e-6):
         return abs(p1.x - p2.x) < eps and abs(p1.y - p2.y) < eps
+    
+    def distanceToSegment(self, ini, end):
+        # Compute the projection of this point onto the line defined by ini and end
+        line_vec = end - ini
+        point_vec = self - ini
+        line_len = line_vec.x ** 2 + line_vec.y ** 2
+        
+        if line_len == 0:
+            return ((self.x - ini.x) ** 2 + (self.y - ini.y) ** 2) ** 0.5
+        
+        t = max(0, min(1, (point_vec.x * line_vec.x + point_vec.y * line_vec.y) / line_len))
+        projection = Point(ini.x + t * line_vec.x, ini.y + t * line_vec.y)
+        
+        return ((self.x - projection.x) ** 2 + (self.y - projection.y) ** 2) ** 0.5
 
     def normalize(self):
         length = (self.x ** 2 + self.y ** 2) ** 0.5
@@ -49,6 +63,11 @@ class Edge:
 
     def __eq__(self, value):
         return (self.ini == value.ini and self.end == value.end) or (self.ini == value.end and self.end == value.ini)
+    
+    def __hash__(self):
+        # As the edge is undirected, the hash must not depend on endpoint order.
+        # Point.__hash__ is defined, so we can use a frozenset of the endpoints.
+        return hash(frozenset((self.ini, self.end)))
 
     def __repr__(self):
         return f"Edge star({self.ini}), end({self.end})"

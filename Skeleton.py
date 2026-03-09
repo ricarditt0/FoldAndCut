@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 
 class graph:
     def __init__(self):
-        self.edges = []
+        self.edges = set()
         self.vertices = set()
 
     def add_vertice(self, vertice:Point):
         self.vertices.add(vertice)
     
     def add_edge(self, edge:Edge):
-        self.edges.append(edge)
+        self.edges.add(edge)
 
     def draw(self, ax, colorP='blue',colorE='red'):
         for edge in self.edges:

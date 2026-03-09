@@ -14,8 +14,12 @@ class Vertex:
         self._isReflex = False
         self.rayDirection = None
 
+
     def __eq__(self, value):
         return self.point == value.point #pode dar problema no futuro
+
+    def __hash__(self):
+        return hash(self.point)
 
     def bisecting(self):
         self.isReflex()
@@ -42,6 +46,9 @@ class Vertex:
         self._isReflex = cross < 0
 
         return cross < 0  # CCW polygon rule
+    
+    def __repr__(self):
+        return f"Vertex({self.point}, isReflex={self._isReflex}, isAlive={self.isAlive}, processed={self.processed})"
 
 class Lav:
     def __init__(self, head:Vertex):
@@ -57,6 +64,9 @@ class Lav:
         self.count += 1
 
     def remove_vertex(self, vertex:Vertex):
+        if vertex is None:
+            return
+
         if self.head == vertex:
             self.head = vertex.next
             self.head.first = True

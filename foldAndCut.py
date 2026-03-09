@@ -171,5 +171,4 @@ if __name__ == "__main__":
             # c.plot(ax, color='purple', linestyle='--')
             continue
 
-
    plt.show()
